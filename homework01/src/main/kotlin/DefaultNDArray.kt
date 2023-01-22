@@ -1,6 +1,4 @@
-import kotlin.math.abs
-
-interface NDArray: SizeAware, DimensionAware {
+interface NDArray : SizeAware, DimensionAware {
     /*
      * Получаем значение по индексу point
      *
@@ -32,7 +30,7 @@ interface NDArray: SizeAware, DimensionAware {
     /*
      * Создаем view для текущего NDArray
      *
-     * Ожидается, что будет создан новая реализация  интерфейса.
+     * Ожидается, что будет создан новая реализация интерфейса.
      * Но она не должна быть видна в коде, использующем эту библиотеку как внешний артефакт
      *
      * Должна быть возможность делать view над view.
@@ -87,17 +85,20 @@ interface NDArray: SizeAware, DimensionAware {
 class DefaultNDArray private constructor(
     private val shape: Shape,
     private val defaultValue: Int = 0,
-    private val points : IntArray = IntArray(shape.size).apply {fill(defaultValue)}) : NDArray {
+    private val points: IntArray = IntArray(shape.size) { defaultValue }
+) : NDArray {
 
 
     companion object {
-        fun ones(shape : Shape) : DefaultNDArray {
+        fun ones(shape: Shape): DefaultNDArray {
             return DefaultNDArray(shape, 1)
         }
-        fun zeros(shape : Shape) : DefaultNDArray {
+
+        fun zeros(shape: Shape): DefaultNDArray {
             return DefaultNDArray(shape, 0)
         }
     }
+
     override val ndim: Int = shape.ndim
     override fun dim(i: Int): Int = shape.dim(i)
 
@@ -107,12 +108,25 @@ class DefaultNDArray private constructor(
         return points[findIdx(point)]
     }
 
-    private fun findIdx(point : Point) : Int {
-        checkPoint(point)
+    private fun findIdx(point: Point): Int {
+        val pointDim = point.ndim
+        val shapeDim = shape.ndim
+        if (ndim != pointDim) {
+            throw NDArrayException.IllegalPointDimensionException(pointDim, shapeDim, "wrong point dimension")
+        }
+        for (dim in 0 until shapeDim) {
+            val shapeDimSize = shape.dim(dim)
+            val pointValue = point.dim(dim)
+            if (0 > pointValue || shapeDimSize <= pointValue) {
+                throw NDArrayException.IllegalPointCoordinateException(
+                    pointValue, shapeDimSize, "wrong point coordinate"
+                )
+            }
+        }
         var idx = 0
         var block = size
         for (tdim in 0 until ndim) {
-            val tsize =  shape.dim(tdim)
+            val tsize = shape.dim(tdim)
             val coordinate = point.dim(tdim)
             block /= tsize
             idx += coordinate * block
@@ -124,34 +138,24 @@ class DefaultNDArray private constructor(
         points[findIdx(point)] = value
     }
 
-    private fun checkPoint(point : Point) {
-        val pointDim = point.ndim
-        val shapeDim = shape.ndim
-        if (ndim != pointDim) {
-            throw NDArrayException.IllegalPointDimensionException(pointDim, shapeDim)
-        }
-        for (dim in 0 until shapeDim) {
-            val shapeDimSize = shape.dim(dim)
-            val pointValue = point.dim(dim)
-            if (0 > pointValue || shapeDimSize <= pointValue) {
-                throw NDArrayException.IllegalPointCoordinateException(pointValue, shapeDimSize)
-            }
-        }
-    }
+
     override fun copy(): NDArray = DefaultNDArray(this.shape, this.defaultValue, this.points.copyOf())
 
-    override fun view(): NDArray = DefaultNDArray(this.shape, this.defaultValue, this.points)
+    override fun view(): NDArray = DefaultNDArrayView(this)
+
+    class DefaultNDArrayView(array: NDArray) : NDArray by array
 
     override fun add(other: NDArray) {
         when (this.ndim) {
             other.ndim -> addEquals(other)
             other.ndim + 1 -> addNotEquals(other)
             else -> throw NDArrayException.IllegalDimensionException(
-                "you can add array only with same dimension or one less")
+                "you can add array only with same dimension or one less"
+            )
         }
     }
 
-    fun addEquals(other: NDArray) {
+    private fun addEquals(other: NDArray) {
         for (dim in 0 until this.ndim) {
             if (this.dim(dim) != other.dim(dim)) {
                 throw NDArrayException.IllegalDimensionException(
@@ -159,10 +163,10 @@ class DefaultNDArray private constructor(
                 )
             }
         }
-       add(other, -1)
+        add(other, -1)
     }
 
-    fun addNotEquals(other: NDArray) {
+    private fun addNotEquals(other: NDArray) {
         var brokenIdx = -1
         var diff = 0
         for (idx in 0 until this.ndim) {
@@ -183,7 +187,7 @@ class DefaultNDArray private constructor(
     private fun add(other: NDArray, brokenIdx: Int) {
         val coords = IntArray(other.ndim)
         var idx = 0
-        while(idx < other.ndim) {
+        while (idx < other.ndim) {
             if (coords[idx] == this.dim(idx) - 1) {
                 coords[idx] = 0
                 idx++
@@ -219,6 +223,7 @@ class DefaultNDArray private constructor(
             this.set(newPoint, this.at(newPoint) + value)
         }
     }
+
     override fun dot(other: NDArray): NDArray {
         if (this.ndim != 2 && other.ndim > 2)
             throw NDArrayException.IllegalDimensionException("you can't .dot only matrix with such dimensions")
@@ -247,7 +252,7 @@ class DefaultNDArray private constructor(
         return resultArray
     }
 
-    private fun dotMatrix(other: NDArray) : NDArray {
+    private fun dotMatrix(other: NDArray): NDArray {
         if (other.dim(0) != other.dim(1))
             throw NDArrayException.IllegalDimensionException("matrix must be rectangle")
         if (this.dim(1) != other.dim(0) || this.dim(0) != other.dim(1))
@@ -267,12 +272,20 @@ class DefaultNDArray private constructor(
 }
 
 sealed class NDArrayException : Exception() {
-    class IllegalPointDimensionException(val pointDimension : Int, val arrayDimension : Int): NDArrayException() {
-
+    class IllegalPointDimensionException(
+        val pointDimension: Int,
+        val arrayDimension: Int,
+        override val message: String
+    ) : NDArrayException() {
     }
-    class IllegalPointCoordinateException(val pointCoordinate : Int, val arrayDimensionSize : Int): NDArrayException() {
 
+    class IllegalPointCoordinateException(
+        val pointCoordinate: Int,
+        val arrayDimensionSize: Int,
+        override val message: String
+    ) : NDArrayException() {
     }
-    class IllegalDimensionException(override val message : String) : NDArrayException() {
+
+    class IllegalDimensionException(override val message: String) : NDArrayException() {
     }
 }
