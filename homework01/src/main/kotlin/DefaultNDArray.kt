@@ -155,6 +155,21 @@ class DefaultNDArray private constructor(
         }
     }
 
+    private fun getPointByIndex(index: Int): Point {
+        val coords = IntArray(this.ndim)
+        var tindex = index
+        var rest = size
+        var current = 0
+        while (rest > 0 && current < this.ndim) {
+            val dim = this.dim(current)
+            coords[current] = tindex / (rest / dim)
+            rest /= dim
+            tindex %= rest
+            current++
+        }
+        return DefaultPoint(*coords)
+    }
+
     private fun addEquals(other: NDArray) {
         for (dim in 0 until this.ndim) {
             if (this.dim(dim) != other.dim(dim)) {
@@ -163,13 +178,13 @@ class DefaultNDArray private constructor(
                 )
             }
         }
-        add(other, -1)
+        addOther(other)
     }
 
     private fun addNotEquals(other: NDArray) {
         var brokenIdx = -1
         var diff = 0
-        for (idx in 0 until this.ndim) {
+        for (idx in 0 until this.ndim - 1) {
             if (this.dim(idx) != other.dim(idx + diff)) {
                 if (brokenIdx != -1) {
                     throw NDArrayException.IllegalDimensionException(
@@ -179,59 +194,33 @@ class DefaultNDArray private constructor(
                 brokenIdx = idx
                 diff = -1
             }
-
         }
-        add(other, brokenIdx)
+        addOther(other)
     }
 
-    private fun add(other: NDArray, brokenIdx: Int) {
-        val coords = IntArray(other.ndim)
-        var idx = 0
-        while (idx < other.ndim) {
-            if (coords[idx] == this.dim(idx) - 1) {
-                coords[idx] = 0
-                idx++
-                continue
-            }
-            if (idx != 0) {
-                coords[idx]++
-                idx--
-                continue
-            } else {
-                val point = DefaultPoint(*coords)
-                makeAddiction(point, brokenIdx, other.at(point))
-                coords[idx]++
-            }
+    private fun getOtherPoint(other: NDArray, point: Point): Point {
+        if (other.ndim == this.ndim)
+            return point
+        val array = IntArray(point.ndim - 1)
+        for (i in 0 until other.ndim) {
+            array[i] = point.dim(i)
         }
+        return DefaultPoint(*array)
     }
 
-    private fun makeAddiction(point: Point, brokenIdx: Int, value: Int) {
-        if (brokenIdx == -1) {
-            this.set(point, this.at(point) + value);
-            return
-        }
-        val pointWithBrokenIndex = IntArray(point.ndim + 1)
-        for (i in 0 until brokenIdx) {
-            pointWithBrokenIndex[i] = point.dim(i)
-        }
-        for (i in brokenIdx until point.ndim) {
-            pointWithBrokenIndex[i + 1] = point.dim(i)
-        }
-        for (i in 0 until this.dim(brokenIdx)) {
-            pointWithBrokenIndex[brokenIdx] = i
-            val newPoint: Point = DefaultPoint(*pointWithBrokenIndex)
-            this.set(newPoint, this.at(newPoint) + value)
+    private fun addOther(other: NDArray) {
+        for (index in 0 until this.points.size) {
+            val point = getPointByIndex(index)
+            this.set(
+                point,
+                this.at(point) + other.at(getOtherPoint(other, point))
+            )
         }
     }
 
     override fun dot(other: NDArray): NDArray {
-        if (this.ndim != 2 && other.ndim > 2)
+        if (this.ndim != 2 || other.ndim > 2)
             throw NDArrayException.IllegalDimensionException("you can't .dot only matrix with such dimensions")
-        val coord = this.dim(0)
-        for (i in 1 until this.ndim) {
-            if (coord != this.dim(i))
-                throw NDArrayException.IllegalDimensionException("matrix must be with a rectangle form")
-        }
         return if (other.ndim == 2)
             dotMatrix(other)
         else
@@ -253,9 +242,9 @@ class DefaultNDArray private constructor(
     }
 
     private fun dotMatrix(other: NDArray): NDArray {
-        if (other.dim(0) != other.dim(1))
+        if (other.ndim != 2)
             throw NDArrayException.IllegalDimensionException("matrix must be rectangle")
-        if (this.dim(1) != other.dim(0) || this.dim(0) != other.dim(1))
+        if (this.dim(1) != other.dim(0))
             throw NDArrayException.IllegalDimensionException("uncompetitive matrices")
         val resultArray = zeros(DefaultShape(this.dim(0), other.dim(1)))
         for (leftDim in 0 until this.dim(0)) {
