@@ -1,4 +1,4 @@
-package homework03
+package homework03.util
 
 class URLMapper {
 

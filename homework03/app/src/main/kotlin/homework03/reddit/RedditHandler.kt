@@ -1,4 +1,4 @@
-package homework03
+package homework03.reddit
 
 import homework03.model.CommentsSnapshot
 import homework03.model.TopicSnapshot

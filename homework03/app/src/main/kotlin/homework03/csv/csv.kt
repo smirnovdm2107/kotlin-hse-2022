@@ -7,7 +7,6 @@ fun <T: Any> csvSerialize(data: Iterable<T>, klass: KClass<T>) = buildString { s
 
 private fun <T: Any> StringBuilder.serializeObject(data: Iterable<T>, klass: KClass<T>) {
     serializeHeader(klass)
-    append("\n")
 
     if (data.any {
             it.javaClass.kotlin != klass
@@ -15,7 +14,6 @@ private fun <T: Any> StringBuilder.serializeObject(data: Iterable<T>, klass: KCl
 
     data.forEach {
         serializeObject(it)
-        append("\n")
     }
 }
 
@@ -24,8 +22,7 @@ private fun StringBuilder.serializeNumber(value: Number) = apply {
 }
 
 private fun StringBuilder.serializeValue(value: Any) = apply {
-    val kClass = value.javaClass.kotlin
-    when (kClass) {
+    when (value.javaClass.kotlin) {
         String::class -> {
             serializeString(value as String)
         }
@@ -42,7 +39,7 @@ private fun StringBuilder.serializeString(value: String) = apply {
 }
 
 private fun <T: Any> StringBuilder.serializeHeader(klass: KClass<T>) = apply {
-    append("")
+    append("\n")
     val properties = klass.memberProperties
 
     when (klass) {
@@ -59,6 +56,7 @@ private fun <T: Any> StringBuilder.serializeHeader(klass: KClass<T>) = apply {
 }
 
 private fun StringBuilder.serializeObject(value: Any) {
+    append("\n")
     val kClass = value.javaClass.kotlin
     val properties = kClass.memberProperties
 
