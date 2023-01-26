@@ -1,5 +1,14 @@
 .idea
+<<<<<<< HEAD
 */.gradle
 */.idea
 */build
 */gradle
+=======
+*/gradle
+.idea/*
+*/build
+.gradle
+*/.gradle
+
+>>>>>>> 417f61f (deleted unnesessary + fixed)
