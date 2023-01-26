@@ -111,7 +111,7 @@ sealed class FList<T> : Iterable<T> {
         override val isEmpty: Boolean
             get() = false
 
-        override fun <U> map(f: (T) -> U): FList<U> = Cons(f.invoke(head), tail.map(f))
+        override fun <U> map(f: (T) -> U): FList<U> = Cons(f(head), tail.map(f))
 
         override fun filter(f: (T) -> Boolean): FList<T> = filter(FList.nil(), this.iterator(), f).reverse()
 
